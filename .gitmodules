@@ -1,0 +1,6 @@
+[submodule "spi-controller"]
+	path = spi-controller
+	url = https://github.com/tornupnegatives/spi-controller
+[submodule "uart"]
+	path = uart
+	url = https://github.com/tornupnegatives/uart
