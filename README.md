@@ -1,1 +1,1 @@
-# SPI Controller to UART Peripheral Bridge
+# UART to SPI Controller Bridge
