@@ -21,12 +21,14 @@ module uart_spi_bridge
     );
 
     // FSM
-    localparam [2:0]
-        READY       = 3'b001,
-        SPI_TXRX    = 3'b010,
-        UART_TX     = 3'b100;
+    localparam [4:0]
+        READY       = 5'b00001,
+        SPI_START   = 5'b00010,
+        SPI_TXRX    = 5'b00100,
+        UART_START  = 5'b01000,
+        UART_TX     = 5'b10000;
 
-    reg [2:0] r_state, r_next_state;
+    reg [4:0] r_state, r_next_state;
 
     // Bridge wires
     wire [7:0] w_uart_rx,       w_spi_rx;
@@ -105,36 +107,45 @@ module uart_spi_bridge
                 if (i_rst_n) begin
                     r_next_uart_rst_n = 'h1;
 
-                    // When UART receives, send data over SPI
+                    // Wait for UART data and place it on the data bus for SPI TX
                     if (w_uart_rx_valid) begin
-                        r_next_spi_tx_valid = 'h1;
                         r_next_tx_bus   = w_uart_rx;
                         r_next_ready    = 'h0;
-                        r_next_state    = SPI_TXRX;
+                        r_next_state    = SPI_START;
                     end
                 end
             end
 
+            SPI_START: begin
+                r_next_spi_tx_valid = 'h1;
+                r_next_state = SPI_TXRX;
+            end
+
             SPI_TXRX: begin
-                // Once SPI is done, result over UART
+                // When SPI TX is complete, send SPI RX back over UART
                 if (w_spi_rx_valid) begin
-                    r_next_tx_bus       = w_spi_rx;
-                    r_next_uart_rst_n   = 'h1;
-                    r_next_uart_tx_valid = 'h1;
-                    r_next_state        = UART_TX;
+                    r_next_tx_bus        = w_spi_rx;
+                    r_next_state         = UART_START;
                 end
 
+                // Hold UART in reset while SPI is transmitting
                 else begin
                     r_next_uart_rst_n = 'h0;
+                    r_next_spi_tx_valid = 'h0;
                 end
+            end
 
-                r_next_spi_tx_valid = 'h0;
+            UART_START: begin
+                // Release UART from reset and begin transmission
+                r_next_uart_rst_n    = 'h1;
+                r_next_uart_tx_valid = 'h1;
+                r_next_state = UART_TX;
             end
 
             UART_TX: begin
-                    r_next_uart_tx_valid = 'h0;
-                    if (w_uart_ready)
-                        r_next_state = READY;
+                r_next_uart_tx_valid = 'h0;
+                if (w_uart_ready)
+                    r_next_state = READY;
             end
         endcase
     end
